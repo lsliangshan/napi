@@ -1,7 +1,6 @@
 import { Page } from "puppeteer";
 import { PuppeteerTaskData } from "../types";
 import { isToday } from "../../utils/time";
-import { sleep } from "../../utils";
 
 export default async function getDailyPositionTask(
   page: Page,

@@ -31,6 +31,9 @@ class EnhancedClusterManager {
           "--no-first-run",
           "--no-zygote",
           "--disable-gpu",
+          "--disable-background-timer-throttling", // 禁用后台定时器节流
+          "--disable-backgrounding-occluded-windows", // 防止窗口被后台化
+          "--disable-renderer-backgrounding", // 禁止降低非前台页面进程优先级
         ],
         defaultViewport: { width: 1280, height: 720 },
       },

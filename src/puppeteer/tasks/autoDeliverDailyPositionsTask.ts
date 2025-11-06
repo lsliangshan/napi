@@ -102,11 +102,11 @@ function handleAutoDeliverZhaopinDailyPositions(
         if (
           response.url().includes("fe-api.zhaopin.com/c/i/search/positions")
         ) {
-          console.log(">>>>>. postData: ", postData);
+          // console.log(">>>>>. postData: ", postData);
           const order = JSON.parse(postData || "{}")?.order;
-          if (order == 4) {
-            console.log(">>>>>. ", response.request().headers());
-          }
+          // if (order == 4) {
+          //   console.log(">>>>>. ", response.request().headers());
+          // }
           return response.status() === 200 && order == 4;
         }
         return false;

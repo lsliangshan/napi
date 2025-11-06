@@ -1,0 +1,17 @@
+module.exports = {
+  apps: [{
+    name: "napi",
+    script: "app.js",
+    cwd: "dist/",
+    max_memory_restart: "1G",
+    autorestart: true,
+    watch: true,
+    exec_mode: "cluster",
+    instances: 2,
+    node_args: "",
+    args: [],
+    env: {
+      NODE_ENV: "production"
+    }
+  }]
+}

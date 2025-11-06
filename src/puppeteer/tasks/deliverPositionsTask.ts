@@ -2,7 +2,6 @@ import { BrowserContext, Page } from "puppeteer";
 import { PuppeteerTaskData } from "../types";
 import clusterManager from "../cluster/index";
 import { createPage } from "../helpers/page";
-import { sleep } from "../../utils";
 
 export default async function deliverPositionsTask(
   page: Page,
@@ -20,6 +19,8 @@ export default async function deliverPositionsTask(
     );
 
     result = await Promise.all(ps);
+
+    await context.close();
   } else if (data.type === "boss") {
     // return await handleBossDailyPositions(page, data);
   } else {
@@ -47,6 +48,9 @@ export default async function deliverPositionsTask(
         repeated: repeated,
       },
     };
+  }
+  if (page) {
+    await page.close();
   }
   return {
     code: 200,
@@ -78,7 +82,8 @@ function handleDeliverZhaopinPositions(
 
       // 1. 点击投递按钮
       await page.waitForSelector(".summary-plane__action button", {
-        timeout: 2000,
+        // timeout: 2000,
+        visible: true,
       });
       const button = await page.$eval(
         ".summary-plane__action button",
@@ -108,8 +113,6 @@ function handleDeliverZhaopinPositions(
 
       // 从响应中获取JSON数据
       const jsonData = await response.json();
-
-      await sleep(1000);
 
       if (jsonData.error) {
         resolve({
