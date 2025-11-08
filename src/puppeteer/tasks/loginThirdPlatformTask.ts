@@ -17,10 +17,11 @@ export default async function loginThirdPlatformTask(
 
   let cookies = [];
   if (data.type === "zhaopin") {
-    cookies = await handleZhaopinLogin(page, data);
+    const result1 = await handleZhaopinLogin(page, data);
+    cookies = result1.cookies;
     return {
       code: 200,
-      data: { sessionId, cookies },
+      data: { sessionId, ...result1 },
     };
   } else if (data.type === "boss") {
     const result = await handleBossSmsCode(page);
@@ -36,7 +37,7 @@ export default async function loginThirdPlatformTask(
 function handleZhaopinLogin(
   page: Page,
   data: PuppeteerTaskData
-): Promise<any[]> {
+): Promise<any> {
   return new Promise(async (resolve) => {
     try {
       // 1. 输入验证码
@@ -54,9 +55,39 @@ function handleZhaopinLogin(
       // 3. 获取登录后的 cookie
       const cookies = await page.cookies();
 
-      resolve(cookies);
+      const responsePromise = page.waitForResponse(
+        (response: any) =>
+          response
+            .url()
+            .includes("fe-api.zhaopin.com/c/i/user/detail") &&
+          response.status() === 200,
+          {
+            timeout: 10000,
+          }
+      );
+      // 等待获取到响应
+      const response = await responsePromise;
+  
+      // 从响应中获取JSON数据
+      const jsonData = await response.json();
+
+      resolve({
+        cookies: cookies,
+        data: {
+          username: encodeURIComponent(jsonData.data.Name || jsonData.data.name || ''),
+          userId: jsonData.data.userId || '',
+          avatar: encodeURIComponent(jsonData.data.PhotoUrl ? `https://mypics.zhaopin.com${jsonData.data.PhotoUrl}` : ''),
+        }
+      });
     } catch (error) {
-      resolve([]);
+      resolve({
+        cookies: [],
+        data: {
+          username: '',
+          userId: '',
+          avatar: '',
+        }
+      });
     } finally {
       await page.close();
     }

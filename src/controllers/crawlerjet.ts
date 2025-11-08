@@ -2,6 +2,7 @@ import Koa from "koa";
 import { createContext } from "../services/puppeteer";
 import { PuppeteerTaskType } from "../puppeteer/types";
 import clusterManager from "../puppeteer/cluster/index";
+
 // import { v4 as uuidv4 } from 'uuid';
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -124,28 +125,44 @@ function handleBossQrcodeLogin(
 }
 
 export const crawlerjetThirdQrcodeLoginHandler = async (ctx: Koa.Context) => {
+  const TIMEOUT = 30 * 60 * 1000;
+  ctx.request.socket.setTimeout(TIMEOUT);
   ctx.set({
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
-    "Access-Control-Allow-Origin": "*", // 根据需要设置CORS
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
   });
+  ctx.respond = false; // ⚠️ 阻止 Koa 自动处理响应
+  ctx.status = 200;
+
+  const stream = ctx.res;
 
   const params =
     ctx.query as unknown as CrawlerjetThirdQrcodeLoginHandlerOptions;
 
   const { context, page } = await createContext();
 
+  async function closePage() {
+    if (page && !page.isClosed) {
+      await page.close();
+    }
+  }
+
+  const ping = setInterval(() => ctx.res.write(":ping\n\n"), 15000);
+  
   try {
     let miniQrcode = "";
+    
     if (params.type === "boss") {
       miniQrcode = await handleBossQrcodeLogin(page, params);
     }
     if (miniQrcode) {
       // 获取到小程序码
-      ctx.res.write(`event: init-qrcode\n`);
-      ctx.res.write(
-        `data: ${JSON.stringify({ code: 200, data: { miniQrcode } })}\n\n`
+      stream.write(
+        `data: ${JSON.stringify({ code: 200, eventName: 'init-qrcode', data: { miniQrcode } })}\n\n`
       );
     }
 
@@ -154,7 +171,10 @@ export const crawlerjetThirdQrcodeLoginHandler = async (ctx: Koa.Context) => {
         response
           .url()
           .includes("www.zhipin.com/wapi/zppassport/qrcode/loginConfirm") &&
-        response.status() === 200
+        response.status() === 200,
+        {
+          timeout: TIMEOUT,
+        }
     );
     // 等待获取到响应
     const response = await responsePromise;
@@ -162,20 +182,49 @@ export const crawlerjetThirdQrcodeLoginHandler = async (ctx: Koa.Context) => {
     // 从响应中获取JSON数据
     const jsonData = await response.json();
 
-    console.log(">>>>>>>>> jsonData 222: ", jsonData);
+    const userInfoResponsePromise = page.waitForResponse(
+      (response: any) =>
+        response
+          .url()
+          .includes("www.zhipin.com/wapi/zpuser/wap/getUserInfo.json") &&
+        response.status() === 200,
+        {
+          timeout: TIMEOUT,
+        }
+    );
+    // 等待获取到响应
+    const userInfoResponse = await userInfoResponsePromise;
 
-    ctx.req.on("close", () => {
-      console.log(">>>>>>> close");
-      ctx.res.end();
+    // 从响应中获取JSON数据
+    const userInfoJsonData = await userInfoResponse.json();
+    
+    const cookies = await page.cookies();
+
+    stream.write(
+      `data: ${JSON.stringify({ code: 200, eventName: 'login-result', data: { username: encodeURIComponent(userInfoJsonData.zpData.name || ''), avatar: encodeURIComponent(userInfoJsonData.zpData.largeAvatar || ''), userId: userInfoJsonData.zpData.userId || '' }, cookies })}\n\n`
+    );
+    await closePage();
+    stream.end();
+    ctx.req.on("close", async () => {
+      clearInterval(ping);
+      await closePage();
+      stream.end();
     });
 
-    ctx.req.on("error", () => {
-      console.log(">>>>>>> error");
-      ctx.res.end();
+    ctx.req.on("error", async () => {
+      clearInterval(ping);
+      await closePage();
+      stream.end();
     });
-  } catch (_) {
-    ctx.body = { code: 1003, message: "登录失败" };
+  } catch (e) {
+    stream.write(
+      `data: ${JSON.stringify({ code: 1003, eventName: 'login-result', message: "登录失败" })}\n\n`
+    );
+    await closePage();
+    stream.end();
   }
+  // // 返回永不 resolve 的 promise，保持连接
+  // return new Promise(() => {});
 };
 
 /**
