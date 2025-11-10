@@ -6,12 +6,13 @@ import dotenv from "dotenv";
 import cors from "koa2-cors";
 import koaBody from "koa-body";
 import { join } from "path";
-import { createServer } from "http";
+import { createServer } from "https";
 import { Server } from "socket.io";
 import SocketIO from "./services/socketio";
 import session from "koa-session";
 import clusterManager from "./puppeteer/cluster/index";
 import { initTask } from "./puppeteer/tasks/index";
+import fs from "fs";
 
 const app = new Koa();
 
@@ -99,7 +100,13 @@ process.on("SIGTERM", async () => {
 });
 
 // Socket.io 设置
-const httpServer = createServer(app.callback());
+const httpServer = createServer(
+  {
+    key: fs.readFileSync(join(__dirname, "key.pem")),
+    cert: fs.readFileSync(join(__dirname, "cert.pem")),
+  },
+  app.callback()
+);
 const io = new Server(httpServer, {
   path: "/ws",
   cors: {
@@ -111,7 +118,14 @@ const io = new Server(httpServer, {
 const socketio = SocketIO.getInstance(io);
 
 io.on("connection", (socket: any) => {
+  console.log(">>>>>. socket.id: ", socket.id);
   socketio.connectionHandler(socket);
+});
+
+const adminNamespace = io.of("/admin");
+adminNamespace.on("connection", (socket) => {
+  console.log("有人连接到了 /admin 命名空间");
+  socket.emit("message", "欢迎来到管理后台");
 });
 
 const PORT = process.env.PORT || 3000;

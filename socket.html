@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Socket.IO 客户端</title>
+  </head>
+  <body>
+    <!-- 由服务端动态提供 -->
+    <script type="module">
+      import { io } from "https://cdn.socket.io/4.7.5/socket.io.esm.min.js";
+
+      window.onload = () => {
+        // 连接到服务器。如果不传参，默认尝试连接为当前页面提供服务的 host[citation:5]
+        const socket = io("wss://localhost:4000", {
+          path: "/ws",
+        });
+
+        // 监听来自服务器的 'chat message' 事件
+        socket.on("chat message", (data) => {
+          console.log("来自服务器的消息:", data);
+          // 在这里更新 DOM，例如将消息添加到聊天记录中
+        });
+      };
+
+      // 示例：点击按钮发送消息
+      function sendMessage() {
+        const messageInput = document.getElementById("messageInput");
+        socket.emit("chat message", messageInput.value); // 向服务器发送 'chat message' 事件
+        messageInput.value = "";
+      }
+    </script>
+    <input type="text" id="messageInput" placeholder="输入消息..." />
+    <button onclick="sendMessage()">发送</button>
+    <ul id="messages"></ul>
+  </body>
+  <!-- <script src="https://cdn.socket.io/4.7.5/socket.io.esm.min.js"></script> -->
+</html>
