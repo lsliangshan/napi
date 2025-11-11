@@ -20,13 +20,30 @@ export function websocketHandler(ws: any, req: any) {
   }
 }
 
-function handleBossQrcodeLogin(page: any): Promise<string> {
+function handleBossQrcodeLogin(page: any, ws: any): Promise<string> {
   return new Promise(async (resolve) => {
     try {
       await page.goto("https://www.zhipin.com/web/user", {
         timeout: 0,
         waitUntil: ["load", "domcontentloaded", "networkidle0", "networkidle2"],
       });
+
+      // await page.setRequestInterception(true);
+
+      // page.on("request", (req: any) => {
+      //   if (
+      //     req.url().includes("www.zhipin.com/wapi/zppassport/qrcode/scanByMp")
+      //   ) {
+      //     ws.send(
+      //       JSON.stringify({
+      //         code: 200,
+      //         eventName: "qrcode-scan",
+      //         data: {},
+      //       })
+      //     );
+      //   }
+      //   req.continue();
+      // });
 
       // 1. 选择我要找工作
       await page.waitForSelector("[ka='signup_geek_tab_click']");
@@ -69,7 +86,7 @@ async function crawlerjetThirdQrcodeLoginHandler(ws: any, query: any) {
     let miniQrcode = "";
 
     if (query.type === "boss") {
-      miniQrcode = await handleBossQrcodeLogin(page);
+      miniQrcode = await handleBossQrcodeLogin(page, ws);
     }
     if (miniQrcode) {
       // 获取到小程序码
@@ -86,8 +103,7 @@ async function crawlerjetThirdQrcodeLoginHandler(ws: any, query: any) {
       (response: any) =>
         response
           .url()
-          .includes("www.zhipin.com/wapi/zppassport/qrcode/loginConfirm") &&
-        response.status() === 200,
+          .includes("www.zhipin.com/wapi/zppassport/qrcode/scanByMp"),
       {
         timeout: TIMEOUT,
       }
@@ -97,6 +113,32 @@ async function crawlerjetThirdQrcodeLoginHandler(ws: any, query: any) {
 
     // 从响应中获取JSON数据
     const jsonData = await response.json();
+
+    if (jsonData.scaned) {
+      ws.send(
+        JSON.stringify({
+          code: 200,
+          eventName: "qrcode-scaned",
+          data: {},
+        })
+      );
+    }
+
+    // const responsePromise = page.waitForResponse(
+    //   (response: any) =>
+    //     response
+    //       .url()
+    //       .includes("www.zhipin.com/wapi/zppassport/qrcode/loginConfirm") &&
+    //     response.status() === 200,
+    //   {
+    //     timeout: TIMEOUT,
+    //   }
+    // );
+    // // 等待获取到响应
+    // const response = await responsePromise;
+
+    // // 从响应中获取JSON数据
+    // const jsonData = await response.json();
 
     const userInfoResponsePromise = page.waitForResponse(
       (response: any) =>
