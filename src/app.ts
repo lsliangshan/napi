@@ -7,12 +7,12 @@ import cors from "koa2-cors";
 import koaBody from "koa-body";
 import { join } from "path";
 import { createServer } from "https";
-import { Server } from "socket.io";
-import SocketIO from "./services/socketio";
 import session from "koa-session";
 import clusterManager from "./puppeteer/cluster/index";
 import { initTask } from "./puppeteer/tasks/index";
 import fs from "fs";
+import { WebSocketServer } from "ws";
+import { websocketHandler } from "./services/websocket";
 
 const app = new Koa();
 
@@ -102,31 +102,31 @@ process.on("SIGTERM", async () => {
 // Socket.io 设置
 const httpServer = createServer(
   {
-    key: fs.readFileSync(join(__dirname, "key.pem")),
-    cert: fs.readFileSync(join(__dirname, "cert.pem")),
+    key: fs.readFileSync("./localhost+3-key.pem"),
+    cert: fs.readFileSync("./localhost+3.pem"),
   },
   app.callback()
 );
-const io = new Server(httpServer, {
-  path: "/ws",
-  cors: {
-    origin: "*", // 或指定某个域名 如 'http://localhost:8080'
-    methods: ["GET", "POST"],
-  },
-});
 
-const socketio = SocketIO.getInstance(io);
+const wss = new WebSocketServer({ server: httpServer });
 
-io.on("connection", (socket: any) => {
-  console.log(">>>>>. socket.id: ", socket.id);
-  socketio.connectionHandler(socket);
-});
+// const socketio = SocketIO.getInstance(wss);
 
-const adminNamespace = io.of("/admin");
-adminNamespace.on("connection", (socket) => {
-  console.log("有人连接到了 /admin 命名空间");
-  socket.emit("message", "欢迎来到管理后台");
-});
+wss.on("connection", websocketHandler);
+
+// const io = new Server(httpServer, {
+//   path: "/ws",
+//   cors: {
+//     origin: "*", // 或指定某个域名 如 'http://localhost:8080'
+//     methods: ["GET", "POST"],
+//     credentials: true,
+//   },
+// });
+
+// io.on("connection", (socket: any) => {
+//   console.log(">>>>>. socket.id: ", socket.id);
+//   socketio.connectionHandler(socket);
+// });
 
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
