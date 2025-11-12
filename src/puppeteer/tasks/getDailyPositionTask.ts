@@ -94,11 +94,11 @@ function handleZhaopinDailyPositions(page: Page, data: PuppeteerTaskData) {
       });
 
       const responsePromise = page.waitForResponse((response: any) => {
-        const postData = response.request().postData();
-
         if (
           response.url().includes("fe-api.zhaopin.com/c/i/search/positions")
         ) {
+          const postData = response.request().postData();
+          console.log(">>>>> postData: ", postData);
           const order = JSON.parse(postData || "{}")?.order;
           return response.status() === 200 && order == 4;
         }
@@ -141,6 +141,7 @@ function handleZhaopinDailyPositions(page: Page, data: PuppeteerTaskData) {
         ...jsonData,
       });
     } catch (error) {
+      console.log(">>>> error: ", error);
       reject({
         code: 1005,
         message: "获取职位列表失败",
