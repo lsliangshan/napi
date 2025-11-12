@@ -28,6 +28,7 @@ export interface CrawlerjetGetDailyPositionsHandlerOptions {
   cookies: any;
   city?: string;
   job?: string;
+  cityPinyin?: string;
 }
 
 export interface CrawlerjetDeliverHandlerOptions {
@@ -42,6 +43,7 @@ export interface CrawlerjetAutoDeliverDailyPositionsHandlerOptions {
   cookies: any;
   city: string;
   job: string;
+  cityPinyin: string;
 }
 
 export interface CrawlerjetValidateLoginStatusHandlerOptions {
@@ -156,17 +158,21 @@ export const crawlerjetThirdQrcodeLoginHandler = async (ctx: Koa.Context) => {
   }
 
   const ping = setInterval(() => ctx.res.write(":ping\n\n"), 15000);
-  
+
   try {
     let miniQrcode = "";
-    
+
     if (params.type === "boss") {
       miniQrcode = await handleBossQrcodeLogin(page, params);
     }
     if (miniQrcode) {
       // 获取到小程序码
       stream.write(
-        `data: ${JSON.stringify({ code: 200, eventName: 'init-qrcode', data: { miniQrcode } })}\n\n`
+        `data: ${JSON.stringify({
+          code: 200,
+          eventName: "init-qrcode",
+          data: { miniQrcode },
+        })}\n\n`
       );
     }
 
@@ -176,9 +182,9 @@ export const crawlerjetThirdQrcodeLoginHandler = async (ctx: Koa.Context) => {
           .url()
           .includes("www.zhipin.com/wapi/zppassport/qrcode/loginConfirm") &&
         response.status() === 200,
-        {
-          timeout: TIMEOUT,
-        }
+      {
+        timeout: TIMEOUT,
+      }
     );
     // 等待获取到响应
     const response = await responsePromise;
@@ -192,20 +198,29 @@ export const crawlerjetThirdQrcodeLoginHandler = async (ctx: Koa.Context) => {
           .url()
           .includes("www.zhipin.com/wapi/zpuser/wap/getUserInfo.json") &&
         response.status() === 200,
-        {
-          timeout: TIMEOUT,
-        }
+      {
+        timeout: TIMEOUT,
+      }
     );
     // 等待获取到响应
     const userInfoResponse = await userInfoResponsePromise;
 
     // 从响应中获取JSON数据
     const userInfoJsonData = await userInfoResponse.json();
-    
+
     const cookies = await page.cookies();
 
     stream.write(
-      `data: ${JSON.stringify({ code: 200, eventName: 'login-result', data: { username: encodeURIComponent(userInfoJsonData.zpData.name || ''), avatar: encodeURIComponent(userInfoJsonData.zpData.largeAvatar || ''), userId: userInfoJsonData.zpData.userId || '' }, cookies })}\n\n`
+      `data: ${JSON.stringify({
+        code: 200,
+        eventName: "login-result",
+        data: {
+          username: encodeURIComponent(userInfoJsonData.zpData.name || ""),
+          avatar: encodeURIComponent(userInfoJsonData.zpData.largeAvatar || ""),
+          userId: userInfoJsonData.zpData.userId || "",
+        },
+        cookies,
+      })}\n\n`
     );
     await closePage();
     stream.end();
@@ -222,7 +237,11 @@ export const crawlerjetThirdQrcodeLoginHandler = async (ctx: Koa.Context) => {
     });
   } catch (e) {
     stream.write(
-      `data: ${JSON.stringify({ code: 1003, eventName: 'login-result', message: "登录失败" })}\n\n`
+      `data: ${JSON.stringify({
+        code: 1003,
+        eventName: "login-result",
+        message: "登录失败",
+      })}\n\n`
     );
     await closePage();
     stream.end();
@@ -267,6 +286,7 @@ export const crawlerjetAutoDeliverDailyPositionsHandler = async (
         cookies: params.cookies,
         city: params.city,
         job: params.job,
+        cityPinyin: params.cityPinyin,
       }
     );
 
@@ -314,6 +334,7 @@ export const crawlerjetGetDailyPositionsHandler = async (ctx: Koa.Context) => {
         city: params.city,
         job: params.job,
         cookies: params.cookies || [],
+        cityPinyin: params.cityPinyin,
       }
     );
 

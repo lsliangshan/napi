@@ -1,6 +1,7 @@
 import { Page } from "puppeteer";
 import { PuppeteerTaskData } from "../types";
 import { isToday } from "../../utils/time";
+import { positionTransform } from "../../utils/position";
 
 export default async function getDailyPositionTask(
   page: Page,
@@ -9,7 +10,7 @@ export default async function getDailyPositionTask(
   if (data.type === "zhaopin") {
     return await handleZhaopinDailyPositions(page, data);
   } else if (data.type === "boss") {
-    // return await handleBossDailyPositions(page, data);
+    return await handleBossDailyPositions(page, data);
   } else {
     throw new Error("Invalid task type");
   }
@@ -135,6 +136,158 @@ function handleZhaopinDailyPositions(page: Page, data: PuppeteerTaskData) {
       );
 
       jsonData.data.list = [...positions];
+
+      resolve({
+        ...jsonData,
+      });
+    } catch (error) {
+      reject({
+        code: 1005,
+        message: "获取职位列表失败",
+        data: {
+          city: data.city,
+          job: data.job,
+        },
+      });
+    }
+  });
+}
+
+function handleBossDailyPositions(page: Page, data: PuppeteerTaskData) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      page.setDefaultNavigationTimeout(0);
+
+      await page.setRequestInterception(true);
+
+      page.on("request", (req) => {
+        const headers = {
+          ...req.headers(),
+        };
+        req.continue({ headers });
+      });
+
+      await page.goto("https://www.zhipin.com/web/geek/jobs", {
+        timeout: 0,
+        waitUntil: "networkidle0",
+      });
+      // await page.waitForNavigation({ waitUntil: "domcontentloaded" });
+
+      // 1. 输入职位
+      await page.waitForSelector(".search-input-box input");
+      await page.type(".search-input-box input", data.job || "", {
+        delay: 100,
+      });
+
+      // 2. 点击城市选择
+      await page.waitForSelector(".city-label");
+      await page.click(".city-label");
+
+      const citySelectResult = await page.$$eval(
+        ".city-char-list li",
+        (items: any, cityPinyin: string) => {
+          const item = items.find(
+            (item: any) =>
+              item.textContent
+                .trim()
+                .toUpperCase()
+                .indexOf(cityPinyin.trim().charAt(0).toUpperCase()) !== -1
+          );
+
+          if (item) {
+            item.click();
+            return true;
+          }
+          return false;
+        },
+        data.cityPinyin
+      );
+      if (!citySelectResult) {
+        reject({
+          code: 1004,
+          message: "城市选择失败",
+          data: {
+            city: data.city,
+            job: data.job,
+          },
+        });
+      }
+
+      // 4. 点击城市
+      await page.waitForSelector(".city-list-select");
+      const result = await page.$$eval(
+        ".city-list-select a",
+        (items: any, city: string) => {
+          const item = items.find(
+            (item: any) => item.textContent.trim() === city.trim()
+          );
+
+          if (item) {
+            item.click();
+            return true;
+          }
+          return false;
+        },
+        data.city
+      );
+      if (!result) {
+        reject({
+          code: 1004,
+          message: "城市选择失败",
+          data: {
+            city: data.city,
+            job: data.job,
+          },
+        });
+      }
+      // 点击搜索按钮
+      await page.waitForSelector(".search-btn");
+      await page.click(".search-btn");
+
+      const responsePromise = page.waitForResponse((response: any) => {
+        const postData = response.request().postData();
+
+        if (
+          response
+            .url()
+            .includes("www.zhipin.com/wapi/zpgeek/search/joblist.json")
+        ) {
+          return response.status() === 200;
+        }
+        return false;
+      });
+      // 等待获取到响应
+      const response = await responsePromise;
+
+      // 从响应中获取JSON数据
+      const jsonData = await response.json();
+
+      if (
+        (jsonData.code !== 200 && jsonData.code !== 0) ||
+        !jsonData.zpData ||
+        !jsonData.zpData.jobList ||
+        jsonData.zpData.jobList.length === 0
+      ) {
+        reject({
+          code: 1006,
+          message: "获取职位列表失败",
+          data: {
+            city: data.city,
+            job: data.job,
+          },
+        });
+        return;
+      }
+
+      jsonData.data = { ...(jsonData.data || {}), list: [] };
+      jsonData.data.list = jsonData.zpData.jobList.map((item: any) =>
+        positionTransform({
+          detail: item,
+          type: "boss",
+        })
+      );
+      jsonData.code = 200;
+      jsonData.zpData = {};
 
       resolve({
         ...jsonData,
