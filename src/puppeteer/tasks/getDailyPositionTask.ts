@@ -173,12 +173,6 @@ function handleBossDailyPositions(page: Page, data: PuppeteerTaskData) {
       });
       // await page.waitForNavigation({ waitUntil: "domcontentloaded" });
 
-      // 1. 输入职位
-      await page.waitForSelector(".search-input-box input");
-      await page.type(".search-input-box input", data.job || "", {
-        delay: 100,
-      });
-
       // 2. 点击城市选择
       await page.waitForSelector(".city-label");
       await page.click(".city-label");
@@ -240,18 +234,26 @@ function handleBossDailyPositions(page: Page, data: PuppeteerTaskData) {
           },
         });
       }
+
+      // 1. 输入职位
+      // case: boss直聘，先输入搜索职位，再选择城市，会清空搜索关键词。
+      await page.waitForSelector(".search-input-box input");
+      await page.type(".search-input-box input", data.job || "", {
+        delay: 100,
+      });
+
       // 点击搜索按钮
       await page.waitForSelector(".search-btn");
       await page.click(".search-btn");
 
       const responsePromise = page.waitForResponse((response: any) => {
-        const postData = response.request().postData();
-
         if (
           response
             .url()
             .includes("www.zhipin.com/wapi/zpgeek/search/joblist.json")
         ) {
+          const postData = response.request().postData();
+          console.log(">>> postData: ", postData);
           return response.status() === 200;
         }
         return false;
