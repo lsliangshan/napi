@@ -98,17 +98,20 @@ function handleAutoDeliverZhaopinDailyPositions(
       });
 
       const responsePromise = page.waitForResponse((response: any) => {
-        const postData = response.request().postData();
-
         if (
           response.url().includes("fe-api.zhaopin.com/c/i/search/positions")
         ) {
-          // console.log(">>>>>. postData: ", postData);
+          const postData = response.request().postData();
+
           const order = JSON.parse(postData || "{}")?.order;
+          const sortType = JSON.parse(postData || "{}")?.sortType;
           // if (order == 4) {
           //   console.log(">>>>>. ", response.request().headers());
           // }
-          return response.status() === 200 && order == 4;
+          return (
+            response.status() === 200 &&
+            (order == 4 || sortType == "JOB_PUBLISH_TIME")
+          );
         }
         return false;
       });
@@ -150,7 +153,7 @@ function handleAutoDeliverZhaopinDailyPositions(
       // 自动投递职位
       const deliverResult = await deliverPositionsTask(page, {
         ...data,
-        numbers: positions.map((item: any) => item.number),
+        numbers: positions.slice(0, 1).map((item: any) => item.number),
       });
 
       if (deliverResult.code === 200) {
