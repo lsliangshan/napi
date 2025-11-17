@@ -100,7 +100,11 @@ function handleZhaopinDailyPositions(page: Page, data: PuppeteerTaskData) {
           const postData = response.request().postData();
           console.log(">>>>> postData: ", postData);
           const order = JSON.parse(postData || "{}")?.order;
-          return response.status() === 200 && order == 4;
+          const sortType = JSON.parse(postData || "{}")?.sortType;
+          return (
+            response.status() === 200 &&
+            (order == 4 || sortType == "JOB_PUBLISH_TIME")
+          );
         }
         return false;
       });
